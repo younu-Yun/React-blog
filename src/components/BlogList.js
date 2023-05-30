@@ -3,17 +3,41 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/Card";
 import LoadingSpinner from "../components/LoadingSpinner";
+import Paginaiton from "./Pagination";
 import { bool } from "prop-types";
 
 const BlogList = ({ isAdmin }) => {
     const navigate = useNavigate();
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [numberOfPosts, setNumberOfPosts] = useState(0);
+    const [numberOfPages, setNumberOfPages] = useState(0);
+    let limit = 10;
 
-    const getPosts = async () => {
-        const response = await axios.get("http://localhost:3002/posts");
+    useEffect(() => {
+        setNumberOfPages(Math.ceil(numberOfPosts / limit));
+    }, [numberOfPosts]);
+
+    const getPosts = async (page = 1) => {
+        setCurrentPage(page);
+        let params = {
+            _page: page,
+            _limit: limit,
+            _id: "id",
+            _order: "desc",
+        };
+
+        if (!isAdmin) {
+            params = { ...params, publish: true };
+        }
+
+        const response = await axios.get(`http://localhost:3002/posts`, {
+            params,
+        });
+
         const data = response.data;
-
+        setNumberOfPosts(response.headers["x-total-count"]);
         setPosts(data);
         setLoading(false);
     };
@@ -44,35 +68,38 @@ const BlogList = ({ isAdmin }) => {
             return <div className="d-flex justify-content-center">No blog posts found</div>;
         }
 
-        return posts
-            .filter(({ publish }) => isAdmin || publish)
-            .map(({ title, id }) => {
-                return (
-                    <Card
-                        key={id}
-                        title={title}
-                        onClick={() => {
-                            navigate(`/blogs/${id}`);
-                        }}
-                    >
-                        {isAdmin ? (
-                            <div>
-                                <button
-                                    className="btn btn-danger btn-sm"
-                                    onClick={(e) => {
-                                        deleteBlog(e, id);
-                                    }}
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        ) : null}
-                    </Card>
-                );
-            });
+        return posts.map(({ title, id }) => {
+            return (
+                <Card
+                    key={id}
+                    title={title}
+                    onClick={() => {
+                        navigate(`/blogs/${id}`);
+                    }}
+                >
+                    {isAdmin ? (
+                        <div>
+                            <button
+                                className="btn btn-danger btn-sm"
+                                onClick={(e) => {
+                                    deleteBlog(e, id);
+                                }}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    ) : null}
+                </Card>
+            );
+        });
     };
 
-    return <>{renderBlogList()}</>;
+    return (
+        <>
+            {renderBlogList()}
+            {numberOfPages > 1 && <Paginaiton currentPage={currentPage} numberOfPages={numberOfPages} onClick={getPosts} />}
+        </>
+    );
 };
 
 BlogList.propTypes = {
